@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 270 30% 98%;
+    --foreground: 260 30% 30%;
+  }
+
+  .dark {
+    --background: 270 30% 10%;
+    --foreground: 260 30% 90%;
+  }
+
+  * {
+    @apply border-default-200;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  .width-regulator {
+    @apply w-full max-w-full md:max-w-4xl xl:max-w-6xl 2xl:max-w-[90rem] mx-auto;
+  }
+
+  h1 {
+    @apply text-4xl font-extrabold tracking-tight lg:text-5xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+
+  h2 {
+    @apply mt-8 mb-4 text-3xl font-bold tracking-tight first:mt-0;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  p {
+    @apply leading-7 text-foreground/80;
+  }
+
+  blockquote {
+    @apply mt-6 border-l-2 border-primary/50 pl-6 italic text-foreground/70;
+  }
+
+  code {
+    @apply relative rounded bg-default-100 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold;
+  }
+
+  p.lead {
+    @apply text-xl text-foreground/90;
+  }
+
+  .large {
+    @apply text-lg font-semibold;
+  }
+
+  .small {
+    @apply text-sm font-medium leading-none;
+  }
+
+  .muted {
+    @apply text-sm text-foreground/60;
+  }
+
+  ul,
+  ol {
+    @apply list-inside;
+  }
+
+  li > p {
+    @apply inline;
+  }
+
+  pre {
+    @apply whitespace-break-spaces rounded-lg bg-default-100 p-4;
+  }
+
+  .post ul {
+    @apply list-disc;
+  }
+
+  /* Modern scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-default-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-default-300 rounded-full hover:bg-default-400 transition-colors;
+  }
+}

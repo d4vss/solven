@@ -1,0 +1,64 @@
+name: Build and Deploy Solven
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build and Deploy Solven App
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create .env file
+        run: |
+          echo "AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}" >> .env
+          echo "AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}" >> .env
+          echo "AUTH_GOOGLE_ID=${{ secrets.AUTH_GOOGLE_ID }}" >> .env
+          echo "AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}" >> .env
+          echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> .env
+          echo "AUTH_TRUST=${{ secrets.AUTH_TRUST }}" >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}" >> .env
+          echo "R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}" >> .env
+          echo "R2_BUCKET=${{ secrets.R2_BUCKET }}" >> .env
+          echo "R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}" >> .env
+
+      - name: Build Docker image
+        run: |
+          docker build -t solven .
+
+      - name: Stop and Remove Existing Container
+        run: |
+          docker stop solven || true
+          docker rm solven || true
+
+      - name: Create Docker Network (if not exists)
+        run: |
+          docker network create remix_network || true
+
+      - name: Run New Container Without Public Port
+        run: |
+          docker run -d \
+            --name solven \
+            --restart unless-stopped \
+            --network remix_network \
+            --env-file .env \
+            solven
+
+      - name: Connect Nginx Proxy Manager to remix_network
+        run: |
+          docker network connect remix_network nginx-app-1 || true
+
+      - name: Cleanup .env file
+        run: |
+          rm .env
+
+      - name: Remove unused Docker images
+        run: |
+          docker image prune -f
