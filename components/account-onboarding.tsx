@@ -150,7 +150,7 @@ export default function AccountOnboarding({
               </p>
 
               <div className="float-right flex gap-x-2 items-center">
-                <Link href="/dashboard/files">
+                <Link href="/dashboard">
                   <Button
                     className="rounded-md"
                     variant="bordered"
