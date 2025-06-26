@@ -15,7 +15,7 @@ export async function deleteFile(fileKey: string) {
   const session = await auth();
 
   if (!session || !session.user)
-    return { success: false, error: "User not found." };
+    return { success: false, message: "User not found." };
 
   const [file] = await db
     .select()
@@ -24,20 +24,20 @@ export async function deleteFile(fileKey: string) {
       and(eq(files.id, fileKey), eq(files.ownerId, session.user.id as string)),
     );
 
-  if (!file) return { success: false, error: "File not found." };
+  if (!file) return { success: false, message: "File not found." };
 
   try {
     await deleteFileNoCheck(`${file.ownerId}/${file.id}/${file.filename}`);
   } catch (err) {
     console.error("Error deleting file from storage:", err);
-    return { success: false, error: "Error deleting file from storage." };
+    return { success: false, message: "Error deleting file from storage." };
   }
 
   try {
     await db.delete(files).where(eq(files.id, fileKey));
   } catch (err) {
     console.error("Error deleting file from database:", err);
-    return { success: false, error: "Error deleting file from database." };
+    return { success: false, message: "Error deleting file from database." };
   }
 
   return { success: true };
@@ -47,7 +47,7 @@ export async function downloadFileAccount(fileKey: string) {
   const session = await auth();
 
   if (!session || !session.user)
-    return { success: false, error: "User not found." };
+    return { success: false, message: "User not found." };
 
   const [file] = await db
     .select()
@@ -64,12 +64,12 @@ export async function downloadFileAccount(fileKey: string) {
       return { success: true, fileUrl };
     } catch (err) {
       console.error("Error getting download URL:", err);
-      return { success: false, error: "Error getting download URL." };
+      return { success: false, message: "Error getting download URL." };
     }
   }
 
   return {
     success: false,
-    error: "An error occurred while getting the download link.",
+    message: "An error occurred while getting the download link.",
   };
 }

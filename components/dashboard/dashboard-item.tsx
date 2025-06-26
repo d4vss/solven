@@ -71,8 +71,7 @@ export function DashboardItem({ item }: DashboardItemProps) {
     try {
       const deleteFn = item.type === "folder" ? deleteFolder : deleteFile;
       const response = await deleteFn(item.id);
-
-      if (response) {
+      if (response.success == false) {
         addToast({
           classNames: {
             base: "rounded-md bottom-5 right-3",
@@ -81,7 +80,7 @@ export function DashboardItem({ item }: DashboardItemProps) {
           },
           variant: "flat",
           color: "danger",
-          title: response.toString(),
+          title: response.message,
         });
 
         return;

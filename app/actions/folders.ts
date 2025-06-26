@@ -106,7 +106,10 @@ export async function createFolder(folderName: string, fileKeys: string[]) {
 export async function deleteFolder(folderId: string) {
   const session = await auth();
 
-  if (!session || !session.user) return "Error | User not found.";
+  if (!session || !session.user) return {
+    success: false,
+    message: "User not found.",
+  };
 
   const [folder] = await db
     .select()
@@ -118,22 +121,33 @@ export async function deleteFolder(folderId: string) {
       ),
     );
 
-  if (!folder) return "Error | Folder not found.";
+  if (!folder) return {
+    success: false,
+    message: "Folder not found."
+  };
 
   try {
     await Promise.all(folder.fileKeys.map((fileKey) => deleteFile(fileKey)));
   } catch {
-    return "Error | Something went wrong removing the file from the server.";
+    return {
+      success: false,
+      message: "Something went wrong removing the file from the server."
+    };
   }
 
   try {
     await db.delete(files).where(eq(files.folderId, folderId));
     await db.delete(folders).where(eq(folders.id, folderId));
   } catch {
-    return "Error | Something went wrong deleting the folder from the database.";
+    return {
+      success: false,
+      message: "Something went wrong deleting the folder from the database."
+    }
   }
 
-  return null;
+  return {
+    success: true
+  };
 }
 
 export async function deleteAllFilesAndFolders() {
@@ -142,7 +156,7 @@ export async function deleteAllFilesAndFolders() {
   if (!session || !session.user)
     return {
       success: false,
-      message: "Error | User not found.",
+      message: "User not found.",
     };
 
   const allFiles = await db
