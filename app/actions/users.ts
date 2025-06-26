@@ -22,7 +22,7 @@ export async function setupUser(username: string, email: string) {
       .where(eq(users.id, session.user.id as string));
   } catch (err) {
     console.error("DB insert went wrong:", err);
-    return { success: false, error: "DB insert went wrong." };
+    return { success: false, error: "This username is already taken." };
   }
 
   return { success: true };
