@@ -28,6 +28,8 @@ jobs:
           echo "R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}" >> .env
           echo "R2_BUCKET=${{ secrets.R2_BUCKET }}" >> .env
           echo "R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}" >> .env
+          echo "NEXTAUTH_URL=https://solven.d4vss.net" >> .env
+          echo "NEXT_PUBLIC_NEXTAUTH_URL=https://solven.d4vss.net" >> .env
 
       - name: Build Docker image
         run: |
