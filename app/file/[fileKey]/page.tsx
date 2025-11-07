@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import DownloadButton from "@/components/download-file-button";
 import FileIcon from "@/components/file-icon";
 import { getFileUrl } from "@/app/actions/files";
+import { fileExists } from "@/utils/r2";
 
 type Props = {
   params: Promise<{ fileKey: string }>;
@@ -175,6 +176,12 @@ export default async function FileView({
   const downloadKey = file.ownerId
     ? `${file.ownerId}/${file.id}/${file.filename}`
     : `anonymous/${file.id}/${file.filename}`;
+
+  const doesFileExist = await fileExists(downloadKey);
+
+  if (!doesFileExist) {
+    return notFound();
+  }
 
   const fileUrl = await getFileUrl(downloadKey);
 

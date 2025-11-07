@@ -85,13 +85,13 @@ export default function UploadDashboard({
 
   return (
     <div>
-      <div className="px-4 max-md:px-0 flex items-center justify-between border-b border-default-200 py-4 bg-default-50">
+      <div className="px-4 max-md:px-0 flex md:items-center justify-between max-md:flex-col border-b border-default-200 py-4 bg-default-50">
         <FilesBreadcrumbs items={breadcrumbsItems} />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 max-md:justify-between w-full px-2">
           {breadcrumbsItems.length == 1 ? (
             <Button
               aria-label="New folder"
-              className="rounded-sm"
+              className="rounded-sm w-full cursor-pointer"
               title="New folder"
               variant="bordered"
               onPress={() => setIsModalOpen(true)}
@@ -101,7 +101,7 @@ export default function UploadDashboard({
           ) : (
             <Button
               aria-label="Copy folder URL"
-              className="rounded-sm"
+              className="rounded-sm w-full cursor-pointer"
               title="Copy folder URL"
               variant="faded"
               onPress={async () =>
@@ -116,7 +116,7 @@ export default function UploadDashboard({
           )}
           <Button
             aria-label="Upload files"
-            className="rounded-sm"
+            className="rounded-sm w-full cursor-pointer"
             title="Upload files"
             variant="faded"
             onPress={onButtonClick}

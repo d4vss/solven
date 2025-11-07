@@ -149,7 +149,14 @@ export default function Terms() {
         <h2 className="text-2xl font-semibold mb-4">11. Contact Information</h2>
         <p className="text-gray-700">
           If you have any questions about these Terms of Service, please contact
-          us at [Your Contact Information].
+          us at{" "}
+          <a
+            className="text-blue-600 hover:underline"
+            href="mailto:solven@d4vss.net"
+          >
+            solven@d4vss.net
+          </a>
+          .
         </p>
       </section>
 

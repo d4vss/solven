@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { folders, files as filesTable, users } from "@/db/schema";
 import { auth } from "@/auth";
 import FileIcon from "@/components/file-icon";
+import { fileExists } from "@/utils/r2";
 
 export default async function FolderView({
   params,
@@ -46,7 +47,43 @@ export default async function FolderView({
     .from(filesTable)
     .where(eq(filesTable.folderId, folderKey));
 
-  if (files.length == 0) {
+  let filteredFiles = [];
+
+  for (const file of files) {
+    const exists = await fileExists(
+      `${folder.ownerId}/${file.id}/${file.name}`,
+    );
+    if (exists) {
+      filteredFiles.push(file);
+    } else {
+      const folder = await db
+        .select({ fileKeys: folders.fileKeys })
+        .from(folders)
+        .where(eq(folders.id, folderKey))
+        .limit(1)
+        .then((rows) => rows[0]);
+
+      if (!folder) return notFound();
+
+      const updatedFileKeys = folder.fileKeys.filter(
+        (key: string) => key !== file.id,
+      );
+
+      await db.delete(filesTable).where(eq(filesTable.id, file.id));
+
+      if (updatedFileKeys.length === 0) {
+        await db.delete(folders).where(eq(folders.id, folderKey));
+        return notFound();
+      }
+
+      await db
+        .update(folders)
+        .set({ fileKeys: updatedFileKeys })
+        .where(eq(folders.id, folderKey));
+    }
+  }
+
+  if (filteredFiles.length == 0) {
     return (
       <div className="h-[78vh] flex flex-col items-center justify-center px-2 text-center">
         <h2 className="uppercase text-3xl font-bold">Folder Is Empty</h2>
@@ -80,7 +117,7 @@ export default async function FolderView({
           </p>
         </div>
         <div className="flex flex-col gap-y-2 pb-4">
-          {files.reverse().map((file, idx) => (
+          {filteredFiles.reverse().map((file, idx) => (
             <div
               key={idx}
               className="border bg-default-100 rounded-xl flex items-center justify-between gap-x-2"
