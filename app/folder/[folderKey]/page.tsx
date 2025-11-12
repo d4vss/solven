@@ -117,43 +117,50 @@ export default async function FolderView({
           </p>
         </div>
         <div className="flex flex-col gap-y-2 pb-4">
-          {filteredFiles.reverse().map((file, idx) => (
-            <div
-              key={idx}
-              className="border bg-default-100 rounded-xl flex items-center justify-between gap-x-2"
-            >
-              <div className="flex items-center gap-x-2 w-full overflow-hidden">
-                <div className="p-4 bg-default-200 rounded-lg w-fit m-3 mr-0">
-                  <FileIcon fileName={file.name} />
-                </div>
-                <div className="flex flex-col gap-y-1.5 px-2 min-w-[200px] md:min-w-[270px]">
-                  <div className="flex items-center gap-x-2 w-full">
-                    <div className="flex-1 flex items-center min-w-0">
-                      <span className="text-sm font-semibold truncate">
-                        {file.name}
-                      </span>
-                      <DotIcon className="w-4 h-4 shrink-0 text-zinc-400" />
-                      <p className="text-zinc-400 text-sm whitespace-pre-line shrink-0">
-                        {formatBytes(file.size)}
-                      </p>
+          <div className="relative">
+            <div className="absolute top-0 left-0 right-0 h-5 from-transparent to-background bg-gradient-to-t transition-all duration-300" />
+
+            <div className="flex flex-col gap-y-2 max-h-72 md:max-h-96 lg:max-h-[510px] overflow-scroll py-5 px-2">
+              {filteredFiles.reverse().map((file, idx) => (
+                <div
+                  key={idx}
+                  className="border bg-default-100 rounded-xl flex items-center justify-between gap-x-2"
+                >
+                  <div className="flex items-center gap-x-2 w-full overflow-hidden">
+                    <div className="p-4 bg-default-200 rounded-lg w-fit m-3 mr-0">
+                      <FileIcon fileName={file.name} />
+                    </div>
+                    <div className="flex flex-col gap-y-1.5 px-2 min-w-[200px] md:min-w-[270px]">
+                      <div className="flex items-center gap-x-2 w-full">
+                        <div className="flex-1 flex items-center min-w-0">
+                          <span className="text-sm font-semibold truncate">
+                            {file.name}
+                          </span>
+                          <DotIcon className="w-4 h-4 shrink-0 text-zinc-400" />
+                          <p className="text-zinc-400 text-sm whitespace-pre-line shrink-0">
+                            {formatBytes(file.size)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                  <Link
+                    className={
+                      "shrink-0 border-l-2 p-7 transition-all h-full rounded-r-xl hover:bg-default-200 cursor-pointer border-default-200"
+                    }
+                    color="foreground"
+                    href={`/file/${file.id}`}
+                    size="sm"
+                    target="_blank"
+                  >
+                    <ArrowUpRightIcon className="w-4 h-4" />
+                  </Link>
                 </div>
-              </div>
-              {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-              <Link
-                className={
-                  "shrink-0 border-l-2 p-7 transition-all h-full rounded-r-xl hover:bg-default-200 cursor-pointer border-default-200"
-                }
-                color="foreground"
-                href={`/file/${file.id}`}
-                size="sm"
-                target="_blank"
-              >
-                <ArrowUpRightIcon className="w-4 h-4" />
-              </Link>
+              ))}
             </div>
-          ))}
+            <div className="absolute bottom-0 left-0 right-0 h-5 from-transparent to-background bg-gradient-to-b transition-all duration-300" />
+          </div>
         </div>
       </div>
     </div>

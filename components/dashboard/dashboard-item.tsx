@@ -45,8 +45,9 @@ export function DashboardItem({ item }: DashboardItemProps) {
   const [clicked, setClicked] = useState(false);
 
   const handleCopy = async () => {
+    const key = item.id.split("-")[item.id.split("-").length - 1];
     await navigator.clipboard.writeText(
-      `${window.location.origin}/${item.type}/${item.id}`,
+      `${window.location.origin}/${item.type}/${key}`,
     );
     addToast({
       classNames: {

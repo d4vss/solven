@@ -1,5 +1,5 @@
 import { AlignLeftIcon, DotIcon } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { Metadata } from "next";
 import Image from "next/image";
@@ -11,7 +11,7 @@ import { auth } from "@/auth";
 import DownloadButton from "@/components/download-file-button";
 import FileIcon from "@/components/file-icon";
 import { getFileUrl } from "@/app/actions/files";
-import { fileExists } from "@/utils/r2";
+import { fileExists, searchObjectsByPartialKey } from "@/utils/r2";
 
 type Props = {
   params: Promise<{ fileKey: string }>;
@@ -152,8 +152,11 @@ export default async function FileView({
 }) {
   const session = await auth();
   const { fileKey } = await params;
+  if (fileKey.length < 8) {
+    return notFound();
+  }
 
-  const [file] = await db
+  const [dbFile] = await db
     .select({
       filename: files.filename,
       uploadedAt: files.uploadedAt,
@@ -165,8 +168,40 @@ export default async function FileView({
     .where(eq(files.id, fileKey))
     .limit(1);
 
+  let file = dbFile;
+
+  let foundFile = null;
+
   if (!file) {
-    return notFound();
+    const key = fileKey.split("-")[fileKey.split("-").length - 1];
+    if (key.length < 8) {
+      return notFound();
+    }
+    foundFile = await searchObjectsByPartialKey(key);
+    if (foundFile.length == 0) {
+      return notFound();
+    }
+  }
+
+  if (foundFile) {
+    const [dbFile2] = await db
+      .select({
+        filename: files.filename,
+        uploadedAt: files.uploadedAt,
+        size: files.size,
+        ownerId: files.ownerId,
+        id: files.id,
+      })
+      .from(files)
+      .where(eq(files.id, (foundFile as string[])[0].split("/")[1] as string))
+      .limit(1);
+
+    file = dbFile2;
+    if (!file) {
+      return notFound();
+    }
+
+    redirect(`/file/${file.id}`);
   }
 
   const [owner] = file.ownerId

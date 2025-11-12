@@ -25,7 +25,7 @@ import {
 import { IoMdOptions } from "react-icons/io";
 import { IoIosLink, IoIosAddCircle } from "react-icons/io";
 import { BsFillTrash3Fill } from "react-icons/bs";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import FileIcon from "../file-icon";
 
@@ -304,8 +304,12 @@ export function UploadPage() {
                             }`}
                             onClick={() => {
                               if (fileObject.status === STATUS.UPLOADED) {
+                                const key =
+                                  fileObject.fileKey.split("-")[
+                                    fileObject.fileKey.split("-").length - 1
+                                  ];
                                 copyTextToClipboard(
-                                  window.location.origin + fileObject.fileUrl,
+                                  window.location.origin + `/file/${key}`,
                                 );
                                 addToast({
                                   variant: "flat",
