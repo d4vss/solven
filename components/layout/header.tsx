@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { LogInIcon, Loader2Icon } from "lucide-react";
@@ -13,11 +14,16 @@ import Logo from "../brand/logo";
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch } = useSession();
   const user = session?.user;
 
   const showSessionLoading = isPending;
-  const hideFloatingAuthButton = pathname === "/signin";
+  const hideAuthCluster =
+    pathname === "/signin" && !isPending && !user;
+
+  useEffect(() => {
+    void refetch();
+  }, [pathname, refetch]);
 
   return (
     <header className="relative h-0 shrink-0">
@@ -56,7 +62,7 @@ export default function Header() {
             </>
           ) : null}
         </nav>
-        {hideFloatingAuthButton ? null : showSessionLoading ? (
+        {hideAuthCluster ? null : showSessionLoading ? (
           <Button
             disabled
             variant="outline"

@@ -4,7 +4,19 @@ import {
   usernameClient,
 } from "better-auth/client/plugins";
 
+function authClientBaseURL() {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    process.env.NEXT_PUBLIC_AUTH_URL?.replace(/\/$/, "") ||
+    "";
+  return fromEnv || undefined;
+}
+
 const authClient = createAuthClient({
+  baseURL: authClientBaseURL(),
   plugins: [usernameClient(), lastLoginMethodClient()],
 });
 
