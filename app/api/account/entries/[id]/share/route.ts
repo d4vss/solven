@@ -14,6 +14,12 @@ import { requireAuthenticatedUserId } from "@/lib/auth/request-user";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 const postSchema = z.object({
   password: z.string().min(1).max(200).optional(),
   expiresAt: z.union([z.string().min(1), z.null()]).optional(),
@@ -40,7 +46,7 @@ export async function GET(request: Request, ctx: RouteCtx) {
         lastAccessAt: r.lastAccessAt?.toISOString() ?? null,
         createdAt: r.createdAt?.toISOString() ?? null,
       })),
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (e) {
     if ((e as Error).message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

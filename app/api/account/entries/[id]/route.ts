@@ -11,6 +11,12 @@ import { requireAuthenticatedUserId } from "@/lib/auth/request-user";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 const patchSchema = z.object({
   expiresAt: z.union([z.string().min(1), z.null()]),
 });
@@ -23,7 +29,10 @@ export async function GET(request: Request, ctx: RouteCtx) {
     if (!row) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ entry: serializeEntry(row) });
+    return NextResponse.json(
+      { entry: serializeEntry(row) },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (e) {
     if ((e as Error).message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

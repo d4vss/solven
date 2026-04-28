@@ -74,7 +74,7 @@ export async function presignMyDownloadAction(input: {
   return { url };
 }
 
-/** Pull a remote URL server-side and store in R2 (same as `/api/storage/remote-upload`). */
+/** Pull a remote URL server-side and store in R2. */
 export async function remoteUploadToMyStorageAction(input: {
   sourceUrl: string;
   filename: string;

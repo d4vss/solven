@@ -5,11 +5,17 @@ import { activateUserPlan } from "@/lib/account/user-plan-repo";
 import { DEFAULT_PLAN_ID, PLAN_IDS } from "@/lib/plans";
 import { requireAuthenticatedUserId } from "@/lib/auth/request-user";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET(request: Request) {
   try {
     const userId = await requireAuthenticatedUserId(request);
     const payload = await buildAccountPlanPayload(userId);
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { headers: NO_STORE_HEADERS });
   } catch (e) {
     if ((e as Error).message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

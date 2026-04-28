@@ -4,6 +4,12 @@ import { serializeEntry } from "@/lib/account/serialize-entry";
 import { purgeExpiredFilesForUser } from "@/lib/account/storage-entry-service";
 import { requireAuthenticatedUserId } from "@/lib/auth/request-user";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 async function sumFolderSizeBytes(
   userId: string,
   folderId: string,
@@ -65,7 +71,7 @@ export async function GET(request: Request) {
       pageSize,
       total,
       totalPages,
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (e) {
     if ((e as Error).message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

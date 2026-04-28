@@ -55,6 +55,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { presignMyUploadAction } from "@/app/actions/storage";
+import {
+  bulkDeleteAccountEntriesAction,
+  createAccountFolderAction,
+  createAccountShareLinkAction,
+  deleteAccountEntryAction,
+  getAccountEntryAction,
+  getAccountPlanAction,
+  listAccountEntriesAction,
+  listAccountShareLinksAction,
+  registerAccountUploadAction,
+  revokeAccountShareLinkAction,
+} from "@/lib/actions/account-explorer";
 import { cn } from "@/lib/utils";
 
 type SerializedEntry = {
@@ -250,9 +263,9 @@ export function AccountExplorer({
   }
 
   const refreshPlan = useCallback(async () => {
-    const r = await fetch("/api/account/plan");
+    const r = await getAccountPlanAction();
     if (r.ok) {
-      setPlan((await r.json()) as AccountPlanPayload);
+      setPlan(r.data as AccountPlanPayload);
     }
   }, []);
 
@@ -260,16 +273,9 @@ export function AccountExplorer({
     if (isRestoringFromQuery) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (parentId !== null) {
-        params.set("parentId", parentId);
-      }
-      params.set("page", String(page));
-      params.set("pageSize", String(pageSize));
-      const q = params.toString();
-      const r = await fetch(`/api/account/entries${q ? `?${q}` : ""}`);
-      if (!r.ok) throw new Error("list");
-      const j = (await r.json()) as {
+      const r = await listAccountEntriesAction({ parentId, page, pageSize });
+      if (!r.ok) throw new Error(r.error || "list");
+      const j = r.data as {
         entries: SerializedEntry[];
         page?: number;
         pageSize?: number;
@@ -325,9 +331,9 @@ export function AccountExplorer({
       const chain: Array<{ id: string; name: string }> = [];
       let cursorId: string | null = folderFromUrl;
       for (let i = 0; i < 64 && cursorId; i += 1) {
-        const r = await fetch(`/api/account/entries/${cursorId}`);
+        const r = await getAccountEntryAction(cursorId);
         if (!r.ok) break;
-        const j = (await r.json()) as {
+        const j = r.data as {
           entry?: {
             id: string;
             parentId: string | null;
@@ -410,16 +416,11 @@ export function AccountExplorer({
     }
     setBusy(true);
     try {
-      const r = await fetch("/api/account/entries/folder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, parentId }),
-      });
-      const j = (await r.json()) as { error?: unknown; code?: string };
+      const r = await createAccountFolderAction({ name, parentId });
       if (!r.ok) {
         const msg =
-          typeof j.error === "string" ? j.error : "Could not create folder.";
-        if (isPlanLimitCode(j.code)) {
+          typeof r.error === "string" ? r.error : "Could not create folder.";
+        if (isPlanLimitCode(r.code)) {
           openPlanLimitDialog(msg);
           return;
         }
@@ -579,33 +580,22 @@ export function AccountExplorer({
     }
     try {
       updateUploadTask(taskId, { status: "uploading" });
-      const pr = await fetch("/api/storage/presign/put", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: task.name,
-          contentType: task.contentType || "application/octet-stream",
-          sizeBytes: task.size,
-        }),
-      });
-      const pj = (await pr.json()) as {
+      const pr = await presignMyUploadAction({
+        filename: task.name,
+        contentType: task.contentType || "application/octet-stream",
+        sizeBytes: task.size,
+      }).catch((e) => ({ error: (e as Error).message } as { error: string }));
+      const pj = pr as {
         error?: string;
         url?: string;
         key?: string;
         code?: string;
       };
-      if (!pr.ok) {
+      if (!pj.url || !pj.key) {
         updateUploadTask(taskId, {
           status: "error",
           error: pj.error ?? "Upload prep failed.",
         });
-        if (pr.status === 429) {
-          stopUploadsForRateLimit(
-            taskId,
-            pj.error ?? "Too many upload requests.",
-          );
-          return false;
-        }
         if (isPlanLimitCode(pj.code)) {
           stopUploadsForPlanLimit(
             taskId,
@@ -635,37 +625,25 @@ export function AccountExplorer({
           });
         },
       });
-      const rr = await fetch("/api/account/entries/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: pj.key,
-          name: task.name,
-          expectedSizeBytes: task.size,
-          parentId,
-        }),
+      const rr = await registerAccountUploadAction({
+        key: pj.key,
+        name: task.name,
+        expectedSizeBytes: task.size,
+        parentId,
       });
-      const rj = (await rr.json()) as { error?: string; code?: string };
       if (!rr.ok) {
         updateUploadTask(taskId, {
           status: "error",
-          error: rj.error ?? "Register failed.",
+          error: rr.error ?? "Register failed.",
         });
-        if (rr.status === 429) {
-          stopUploadsForRateLimit(
-            taskId,
-            rj.error ?? "Too many upload requests.",
-          );
-          return false;
-        }
-        if (isPlanLimitCode(rj.code)) {
+        if (isPlanLimitCode(rr.code)) {
           stopUploadsForPlanLimit(
             taskId,
-            rj.error ?? "Could not register file.",
+            rr.error ?? "Could not register file.",
           );
           return false;
         }
-        toast.error(rj.error ?? "Register failed.");
+        toast.error(rr.error ?? "Register failed.");
         return false;
       }
       updateUploadTask(taskId, {
@@ -805,13 +783,12 @@ export function AccountExplorer({
   const loadShareLinks = useCallback(async (entryId: string) => {
     setShareLinksLoading(true);
     try {
-      const r = await fetch(`/api/account/entries/${entryId}/share`);
-      const j = (await r.json()) as { links?: ShareLinkRow[]; error?: string };
+      const r = await listAccountShareLinksAction(entryId);
       if (!r.ok) {
-        toast.error(j.error ?? "Could not load share links.");
+        toast.error(r.error ?? "Could not load share links.");
         return;
       }
-      setShareLinks(j.links ?? []);
+      setShareLinks((r.data.links as ShareLinkRow[]) ?? []);
     } finally {
       setShareLinksLoading(false);
     }
@@ -856,17 +833,13 @@ export function AccountExplorer({
     }
     setBusy(true);
     try {
-      const r = await fetch(`/api/account/entries/${shareEntry.id}/share`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(sharePassword.trim() ? { password: sharePassword.trim() } : {}),
-          ...(expiresAt !== undefined ? { expiresAt } : {}),
-        }),
+      const r = await createAccountShareLinkAction({
+        entryId: shareEntry.id,
+        ...(sharePassword.trim() ? { password: sharePassword.trim() } : {}),
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
       });
-      const j = (await r.json()) as { error?: string; url?: string };
-      if (!r.ok || !j.url) {
-        const msg = j.error ?? "Could not create share link.";
+      if (!r.ok || !r.data.url) {
+        const msg = r.ok ? "Could not create share link." : r.error;
         if (msg.toLowerCase().includes("plan")) {
           openPlanLimitDialog(msg);
           return;
@@ -874,7 +847,7 @@ export function AccountExplorer({
         toast.error(msg);
         return;
       }
-      await navigator.clipboard.writeText(j.url);
+      await navigator.clipboard.writeText(r.data.url);
       await loadShareLinks(shareEntry.id);
       toast.success("Share link copied to clipboard.");
     } finally {
@@ -892,12 +865,9 @@ export function AccountExplorer({
     if (!shareEntry) return;
     setRevokingShareId(shareId);
     try {
-      const r = await fetch(`/api/account/shares/${shareId}`, {
-        method: "DELETE",
-      });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      const r = await revokeAccountShareLinkAction(shareId);
       if (!r.ok) {
-        toast.error(j.error ?? "Could not delete share link.");
+        toast.error(r.error ?? "Could not delete share link.");
         return;
       }
       setShareLinks((prev) => prev.filter((link) => link.id !== shareId));
@@ -916,12 +886,9 @@ export function AccountExplorer({
     if (!deleteEntry) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/account/entries/${deleteEntry.id}`, {
-        method: "DELETE",
-      });
-      const j = (await r.json()) as { error?: string };
+      const r = await deleteAccountEntryAction(deleteEntry.id);
       if (!r.ok) {
-        toast.error(j.error ?? "Delete failed.");
+        toast.error(r.error ?? "Delete failed.");
         return;
       }
       await loadEntries();
@@ -938,17 +905,9 @@ export function AccountExplorer({
     if (selectedIds.length === 0) return;
     setBusy(true);
     try {
-      const r = await fetch("/api/account/entries/bulk-delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entryIds: selectedIds }),
-      });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        deleted?: number;
-      };
+      const r = await bulkDeleteAccountEntriesAction({ entryIds: selectedIds });
       if (!r.ok) {
-        toast.error(j.error ?? "Could not delete selected items.");
+        toast.error(r.error ?? "Could not delete selected items.");
         return;
       }
       setBulkDeleteOpen(false);
@@ -956,7 +915,7 @@ export function AccountExplorer({
       await loadEntries();
       await refreshPlan();
       toast.success(
-        `Deleted ${j.deleted ?? selectedIds.length} selected item(s).`,
+        `Deleted ${r.data.deleted ?? selectedIds.length} selected item(s).`,
       );
     } finally {
       setBusy(false);
