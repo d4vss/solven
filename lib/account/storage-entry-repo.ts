@@ -4,16 +4,22 @@ import { storageEntry } from "@/lib/db/schema";
 
 export type StorageEntryRow = typeof storageEntry.$inferSelect;
 
+function isRootParentIdCondition() {
+  return or(
+    isNull(storageEntry.parentId),
+    eq(storageEntry.parentId, ""),
+    sql`lower(${storageEntry.parentId}) = 'null'`,
+    sql`lower(${storageEntry.parentId}) = 'undefined'`,
+  );
+}
+
 export async function listEntries(
   userId: string,
   parentId: string | null,
 ): Promise<StorageEntryRow[]> {
   const cond =
     parentId === null || parentId === ""
-      ? and(
-          eq(storageEntry.userId, userId),
-          or(isNull(storageEntry.parentId), eq(storageEntry.parentId, "")),
-        )
+      ? and(eq(storageEntry.userId, userId), isRootParentIdCondition())
       : and(eq(storageEntry.userId, userId), eq(storageEntry.parentId, parentId));
   return db
     .select()
@@ -177,7 +183,7 @@ export async function nameExistsInFolder(
     parentId === null || parentId === ""
       ? and(
           eq(storageEntry.userId, userId),
-          or(isNull(storageEntry.parentId), eq(storageEntry.parentId, "")),
+          isRootParentIdCondition(),
           eq(storageEntry.name, name),
         )
       : and(
