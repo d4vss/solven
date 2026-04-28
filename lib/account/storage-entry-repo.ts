@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import db from "@/lib/db";
 import { storageEntry } from "@/lib/db/schema";
 
@@ -10,7 +10,10 @@ export async function listEntries(
 ): Promise<StorageEntryRow[]> {
   const cond =
     parentId === null || parentId === ""
-      ? and(eq(storageEntry.userId, userId), isNull(storageEntry.parentId))
+      ? and(
+          eq(storageEntry.userId, userId),
+          or(isNull(storageEntry.parentId), eq(storageEntry.parentId, "")),
+        )
       : and(eq(storageEntry.userId, userId), eq(storageEntry.parentId, parentId));
   return db
     .select()
@@ -174,7 +177,7 @@ export async function nameExistsInFolder(
     parentId === null || parentId === ""
       ? and(
           eq(storageEntry.userId, userId),
-          isNull(storageEntry.parentId),
+          or(isNull(storageEntry.parentId), eq(storageEntry.parentId, "")),
           eq(storageEntry.name, name),
         )
       : and(
