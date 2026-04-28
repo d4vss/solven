@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   CloudUploadIcon,
   FileIcon,
@@ -10,6 +11,12 @@ import { OnboardingView } from "@/components/onboarding/onboarding-view";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/auth";
+
+export const metadata: Metadata = {
+  title: "Solven",
+  description:
+    "File sharing that feels like a desktop explorer. Upload, organize, and share with secure links.",
+};
 
 const homeActionClassName = cn(
   "flex h-auto min-h-14 w-full cursor-pointer items-center justify-center rounded-xl px-4 py-5 text-sm font-medium sm:min-h-16 sm:px-5 sm:py-6",

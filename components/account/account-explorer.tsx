@@ -14,6 +14,7 @@ import {
   DownloadIcon,
   FileIcon,
   FolderIcon,
+  LinkIcon,
   Loader2Icon,
   Share2Icon,
   Trash2Icon,
@@ -55,7 +56,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { presignMyUploadAction } from "@/app/actions/storage";
+import {
+  getRemoteUploadJobAction,
+  presignMyUploadAction,
+  startRemoteUploadJobAction,
+} from "@/app/actions/storage";
 import {
   bulkDeleteAccountEntriesAction,
   createAccountFolderAction,
@@ -201,6 +206,17 @@ function isBlockedUploadFile(name: string) {
   return ext ? BLOCKED_UPLOAD_EXTENSIONS.has(ext) : false;
 }
 
+function filenameFromRemoteUrl(rawUrl: string) {
+  try {
+    const pathname = new URL(rawUrl).pathname;
+    const part = pathname.split("/").filter(Boolean).pop();
+    if (!part) return "remote-file";
+    return decodeURIComponent(part).trim() || "remote-file";
+  } catch {
+    return "remote-file";
+  }
+}
+
 export function AccountExplorer({
   initialPlan,
 }: {
@@ -237,6 +253,9 @@ export function AccountExplorer({
   const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [remoteUploadOpen, setRemoteUploadOpen] = useState(false);
+  const [remoteUploadUrl, setRemoteUploadUrl] = useState("");
+  const [remoteUploadName, setRemoteUploadName] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteEntry, setDeleteEntry] = useState<SerializedEntry | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -732,6 +751,167 @@ export function AccountExplorer({
     }
   }
 
+  async function uploadRemoteFile() {
+    if (!canUseRemoteUpload) {
+      openPlanLimitDialog("Remote upload is only available on the Diamond plan.");
+      return;
+    }
+    const sourceUrl = remoteUploadUrl.trim();
+    if (!sourceUrl) {
+      toast.error("Remote URL is required.");
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(sourceUrl);
+    } catch {
+      toast.error("Enter a valid URL.");
+      return;
+    }
+    if (parsed.protocol !== "https:") {
+      toast.error("Only HTTPS links are allowed.");
+      return;
+    }
+    const requestedName = remoteUploadName.trim();
+    const provisionalName = requestedName || filenameFromRemoteUrl(sourceUrl);
+    if (requestedName && isBlockedUploadFile(requestedName)) {
+      toast.error(`Blocked file type: ${requestedName}`);
+      return;
+    }
+    setRemoteUploadOpen(false);
+    setRemoteUploadUrl("");
+    setRemoteUploadName("");
+
+    const taskId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setUploadTasks((prev) => [
+      ...prev,
+      {
+        id: taskId,
+          name: provisionalName,
+        contentType: "application/octet-stream",
+          file: new File([], provisionalName),
+        size: 1,
+        loaded: 0,
+        speedBps: 0,
+        status: "queued",
+      },
+    ]);
+    setBusy(true);
+    try {
+      const started = await startRemoteUploadJobAction({
+        sourceUrl,
+        ...(requestedName ? { filename: requestedName } : {}),
+      }).catch((e) => ({ error: (e as Error).message } as { error: string }));
+      if ("error" in started) {
+        const msg = started.error || "Remote upload failed.";
+        updateUploadTask(taskId, { status: "error", error: msg });
+        if (msg.toLowerCase().includes("plan")) {
+          openPlanLimitDialog(msg);
+          return;
+        }
+        toast.error(msg);
+        return;
+      }
+      const jobId = started.jobId;
+      let uploaded:
+        | { key: string; size: number; contentType?: string; filename?: string }
+        | null = null;
+      for (let i = 0; i < 1200; i += 1) {
+        const job = await getRemoteUploadJobAction(jobId);
+        if (!job) {
+          updateUploadTask(taskId, {
+            status: "error",
+            error: "Remote upload tracking was lost.",
+          });
+          return;
+        }
+        const total = Math.max(job.totalBytes ?? job.loadedBytes ?? 1, 1);
+        if (job.stage === "error") {
+          const msg = job.error ?? "Remote upload failed.";
+          updateUploadTask(taskId, {
+            status: "error",
+            error: msg,
+            speedBps: 0,
+          });
+          if (msg.toLowerCase().includes("plan")) {
+            openPlanLimitDialog(msg);
+            return;
+          }
+          toast.error(msg);
+          return;
+        }
+        if (job.stage === "done") {
+          uploaded = {
+            key: job.key ?? "",
+            size: job.size ?? job.loadedBytes,
+            contentType: job.contentType,
+            filename: job.filename,
+          };
+          updateUploadTask(taskId, {
+            status: "uploading",
+            name: uploaded.filename ?? provisionalName,
+            loaded: uploaded.size,
+            size: Math.max(uploaded.size, 1),
+            speedBps: 0,
+          });
+          break;
+        }
+        updateUploadTask(taskId, {
+          status: "uploading",
+          loaded: Math.min(job.loadedBytes, total),
+          size: total,
+          speedBps: Math.max(job.speedBps ?? 0, 0),
+        });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      if (!uploaded || !uploaded.key) {
+        updateUploadTask(taskId, {
+          status: "error",
+          error: "Remote upload timed out.",
+          speedBps: 0,
+        });
+        toast.error("Remote upload timed out.");
+        return;
+      }
+
+      const registered = await registerAccountUploadAction({
+        key: uploaded.key,
+        name: uploaded.filename ?? provisionalName,
+        expectedSizeBytes: uploaded.size,
+        parentId,
+      });
+      if (!registered.ok) {
+        const msg = registered.error ?? "Could not register remote file.";
+        updateUploadTask(taskId, {
+          status: "error",
+          error: msg,
+          speedBps: 0,
+        });
+        if (isPlanLimitCode(registered.code)) {
+          openPlanLimitDialog(msg);
+          return;
+        }
+        toast.error(msg);
+        return;
+      }
+      updateUploadTask(taskId, {
+        status: "done",
+        loaded: uploaded.size,
+        size: Math.max(uploaded.size, 1),
+        speedBps: 0,
+      });
+
+      await loadEntries();
+      await refreshPlan();
+      toast.success("Remote file uploaded.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doDownload(id: string) {
     setBusy(true);
     try {
@@ -972,6 +1152,7 @@ export function AccountExplorer({
   }
 
   const limits = plan?.plan.limits;
+  const canUseRemoteUpload = plan?.slug === "diamond";
   const uploadDailyCap = limits?.dailyUploadBytesCap ?? null;
   const uploadUsedToday = plan?.usage.uploadUsedTodayBytes ?? 0;
   const storageCap = limits?.maxTotalStorageBytes ?? null;
@@ -1025,6 +1206,23 @@ export function AccountExplorer({
               className="rounded border border-border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted/50 disabled:opacity-50"
             >
               New folder
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canUseRemoteUpload}
+              onClick={() => {
+                if (!canUseRemoteUpload) {
+                  openPlanLimitDialog(
+                    "Remote upload is only available on the Diamond plan.",
+                  );
+                  return;
+                }
+                setRemoteUploadOpen(true);
+              }}
+              className="inline-flex items-center gap-1 rounded border border-border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted/50 disabled:opacity-50"
+            >
+              <LinkIcon className="size-3.5" aria-hidden />
+              <span>Remote upload</span>
             </button>
             {busy ? (
               <Loader2Icon
@@ -1493,6 +1691,53 @@ export function AccountExplorer({
         message={planLimitMessage}
         currentPlanSlug={plan?.slug ?? "free"}
       />
+      <Dialog open={remoteUploadOpen} onOpenChange={setRemoteUploadOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload from URL</DialogTitle>
+            <DialogDescription>
+              Paste an HTTPS file link and Solven will copy it into this folder.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="https://example.com/file.pdf"
+              value={remoteUploadUrl}
+              onChange={(e) => setRemoteUploadUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void uploadRemoteFile();
+              }}
+            />
+            <Input
+              placeholder="Optional display name"
+              value={remoteUploadName}
+              onChange={(e) => setRemoteUploadName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void uploadRemoteFile();
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Only HTTPS links are accepted.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRemoteUploadOpen(false);
+                setRemoteUploadUrl("");
+                setRemoteUploadName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" disabled={busy} onClick={() => void uploadRemoteFile()}>
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

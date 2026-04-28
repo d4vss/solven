@@ -1,7 +1,14 @@
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import { AccountExplorer } from "@/components/account/account-explorer";
 import { buildAccountPlanPayload } from "@/lib/account/api-plan-json";
 import { auth } from "@/lib/auth";
+
+export const metadata: Metadata = {
+  title: "Storage Explorer",
+  description:
+    "Browse storage, upload files, create share links, and manage downloads.",
+};
 
 export default async function AccountPage() {
   const session = await auth.api.getSession({

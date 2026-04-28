@@ -32,10 +32,10 @@ export async function getResolvedPlanForUser(userId: string) {
 }
 
 export async function assertRemoteUploadAllowed(userId: string) {
-  const { plan } = await getResolvedPlanForUser(userId);
-  if (!plan.limits.remoteUploadEnabled) {
+  const { slug, plan } = await getResolvedPlanForUser(userId);
+  if (slug !== "diamond" || !plan.limits.remoteUploadEnabled) {
     throw new PlanQuotaError(
-      "Remote upload is disabled for your plan.",
+      "Remote upload is only available on the Diamond plan.",
       "PLAN_REMOTE_DISABLED",
     );
   }
