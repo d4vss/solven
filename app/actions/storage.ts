@@ -2,6 +2,7 @@
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { Readable, Transform } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import {
   assertRemoteUploadAllowed,
   checkUploadAllowed,
@@ -170,7 +171,7 @@ async function streamRemoteFileToStorage(input: {
   let loadedBytes = 0;
   let prevLoadedBytes = 0;
   let prevAt = Date.now();
-  const stream = Readable.fromWeb(res.body as globalThis.ReadableStream<Uint8Array>).pipe(
+  const stream = Readable.fromWeb(res.body as NodeReadableStream<Uint8Array>).pipe(
     new Transform({
       transform(chunk, _encoding, callback) {
         const size = Buffer.isBuffer(chunk)
