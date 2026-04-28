@@ -8,6 +8,7 @@ import { LogInIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeaderSessionActions } from "@/components/layout/header-session-actions";
+import { onAuthChanged } from "@/lib/auth-events";
 import { useSession } from "@/lib/auth-client";
 import Logo from "../brand/logo";
 
@@ -24,6 +25,12 @@ export default function Header() {
   useEffect(() => {
     void refetch();
   }, [pathname, refetch]);
+
+  useEffect(() => {
+    return onAuthChanged(() => {
+      void refetch();
+    });
+  }, [refetch]);
 
   return (
     <header className="relative h-0 shrink-0">

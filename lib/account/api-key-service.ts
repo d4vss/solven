@@ -6,15 +6,8 @@ import { userApiKey } from "@/lib/db/schema";
 const KEY_PREFIX = "svk_";
 const MAX_KEYS_PER_USER = 25;
 
-function pepper(): string {
-  return process.env.API_KEY_PEPPER ?? "";
-}
-
 export function hashApiKey(raw: string): string {
-  return createHash("sha256")
-    .update(pepper(), "utf8")
-    .update(raw, "utf8")
-    .digest("hex");
+  return createHash("sha256").update(raw, "utf8").digest("hex");
 }
 
 export function generateRawApiKey(): string {

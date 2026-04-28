@@ -7,6 +7,7 @@ import { LogOutIcon, UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { signOut } from "@/lib/auth-client";
+import { emitAuthChanged } from "@/lib/auth-events";
 import { accountChipBorderClass } from "@/lib/plans/resolve";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export function HeaderSessionActions({ user }: { user: SessionUser }) {
   async function doSignOut() {
     try {
       await signOut();
+      emitAuthChanged();
       toast.success("Signed out", {
         description: "You can sign in again anytime.",
       });

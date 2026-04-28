@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import {
   isLikelyApiKeyToken,
@@ -29,9 +28,7 @@ export async function requireAuthenticatedUserId(
     }
   }
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await auth.api.getSession({ headers: request.headers });
   const id = session?.user?.id;
   if (!id) {
     throw new Error("Unauthorized");
