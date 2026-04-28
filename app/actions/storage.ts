@@ -1,5 +1,7 @@
 "use server";
 
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { Readable, Transform } from "node:stream";
 import {
   assertRemoteUploadAllowed,
   checkUploadAllowed,
@@ -10,8 +12,9 @@ import {
   createPresignedGetUrl,
   createPresignedPutUrl,
   deleteObjectKey,
+  getR2Env,
+  getR2S3Client,
   listObjectKeysUnderPrefix,
-  putObjectBytes,
   buildObjectKey,
   userStoragePrefix,
 } from "@/lib/storage";
@@ -121,6 +124,106 @@ function resolveRemoteFilename(input: {
   return ensureExtension(sanitizeFilename(base), input.contentType);
 }
 
+async function streamRemoteFileToStorage(input: {
+  userId: string;
+  sourceUrl: string;
+  requestedName?: string;
+  requestedContentType?: string;
+  maxBytes: number;
+  onProgress?: (p: { loadedBytes: number; totalBytes: number | null; speedBps: number }) => void;
+}) {
+  const res = await fetch(input.sourceUrl, {
+    redirect: "follow",
+    cache: "no-store",
+    headers: { "User-Agent": "SolvenRemoteUpload/1.0" },
+  });
+  if (!res.ok) {
+    throw new Error(`Remote fetch failed: ${res.status} ${res.statusText}`);
+  }
+  if (!res.body) {
+    throw new Error("Remote response is not streamable.");
+  }
+
+  const maxBytes = input.maxBytes;
+  const len = res.headers.get("content-length");
+  const declaredTotal = len ? Number(len) : Number.NaN;
+  const totalBytes = Number.isFinite(declaredTotal) ? declaredTotal : null;
+  if (totalBytes !== null && totalBytes > maxBytes) {
+    throw new Error("Remote file too large");
+  }
+  if (totalBytes !== null) {
+    await checkUploadAllowed(input.userId, totalBytes);
+  }
+
+  const contentType =
+    input.requestedContentType?.trim() ||
+    res.headers.get("content-type")?.split(";")[0]?.trim() ||
+    "application/octet-stream";
+  const filename = resolveRemoteFilename({
+    requestedName: input.requestedName,
+    sourceUrl: input.sourceUrl,
+    contentDisposition: res.headers.get("content-disposition"),
+    contentType,
+  });
+  const key = buildObjectKey(input.userId, filename);
+
+  let loadedBytes = 0;
+  let prevLoadedBytes = 0;
+  let prevAt = Date.now();
+  const stream = Readable.fromWeb(res.body as globalThis.ReadableStream<Uint8Array>).pipe(
+    new Transform({
+      transform(chunk, _encoding, callback) {
+        const size = Buffer.isBuffer(chunk)
+          ? chunk.length
+          : chunk instanceof Uint8Array
+            ? chunk.byteLength
+            : Buffer.byteLength(String(chunk));
+        loadedBytes += size;
+        if (loadedBytes > maxBytes) {
+          callback(new Error("Remote file too large"));
+          return;
+        }
+        const now = Date.now();
+        const deltaMs = Math.max(now - prevAt, 1);
+        const speedBps = ((loadedBytes - prevLoadedBytes) / deltaMs) * 1000;
+        prevLoadedBytes = loadedBytes;
+        prevAt = now;
+        input.onProgress?.({
+          loadedBytes,
+          totalBytes,
+          speedBps,
+        });
+        callback(null, chunk);
+      },
+    }),
+  );
+
+  try {
+    const env = getR2Env();
+    await getR2S3Client().send(
+      new PutObjectCommand({
+        Bucket: env.bucket,
+        Key: key,
+        Body: stream,
+        ContentType: contentType,
+        ...(totalBytes !== null ? { ContentLength: totalBytes } : {}),
+      }),
+    );
+  } catch (e) {
+    await deleteObjectKey(key).catch(() => {});
+    throw e;
+  }
+
+  try {
+    await checkUploadAllowed(input.userId, loadedBytes);
+  } catch (e) {
+    await deleteObjectKey(key).catch(() => {});
+    throw e;
+  }
+
+  return { key, size: loadedBytes, contentType, filename, totalBytes };
+}
+
 /** List object keys under your user prefix (optionally relative `prefix`). */
 export async function listMyStorageKeysAction(relativePrefix = "") {
   const uid = await userId();
@@ -187,40 +290,19 @@ export async function remoteUploadToMyStorageAction(input: {
   }
   const { plan } = await getResolvedPlanForUser(uid);
   await assertRemoteUploadAllowed(uid);
-  const res = await fetch(input.sourceUrl, {
-    redirect: "follow",
-    headers: { "User-Agent": "SolvenRemoteUpload/1.0" },
-  });
-  if (!res.ok) {
-    throw new Error(`Remote fetch failed: ${res.status} ${res.statusText}`);
-  }
-  const maxBytes = plan.limits.maxSingleFileBytes;
-  const len = res.headers.get("content-length");
-  if (len != null && Number(len) > maxBytes) {
-    throw new Error("Remote file too large");
-  }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > maxBytes) {
-    throw new Error("Remote file too large");
-  }
-  await checkUploadAllowed(uid, buf.length);
-  const contentType =
-    input.contentType?.trim() ||
-    res.headers.get("content-type")?.split(";")[0]?.trim() ||
-    "application/octet-stream";
-  const filename = resolveRemoteFilename({
-    requestedName: input.filename,
+  const out = await streamRemoteFileToStorage({
+    userId: uid,
     sourceUrl: input.sourceUrl,
-    contentDisposition: res.headers.get("content-disposition"),
-    contentType,
+    requestedName: input.filename,
+    requestedContentType: input.contentType,
+    maxBytes: plan.limits.maxSingleFileBytes,
   });
-  const key = buildObjectKey(uid, filename);
-  await putObjectBytes({
-    key,
-    body: buf,
-    contentType,
-  });
-  return { key, size: buf.length, contentType, filename };
+  return {
+    key: out.key,
+    size: out.size,
+    contentType: out.contentType,
+    filename: out.filename,
+  };
 }
 
 type RemoteUploadStage =
@@ -297,98 +379,36 @@ export async function startRemoteUploadJobAction(input: {
     try {
       await assertRemoteUploadAllowed(uid);
       const { plan } = await getResolvedPlanForUser(uid);
-      const maxBytes = plan.limits.maxSingleFileBytes;
-      const res = await fetch(sourceUrl, {
-        redirect: "follow",
-        headers: { "User-Agent": "SolvenRemoteUpload/1.0" },
-      });
-      if (!res.ok) {
-        throw new Error(`Remote fetch failed: ${res.status} ${res.statusText}`);
-      }
-      const len = res.headers.get("content-length");
-      const parsedLen = len ? Number(len) : Number.NaN;
-      if (Number.isFinite(parsedLen) && parsedLen > maxBytes) {
-        throw new Error("Remote file too large");
-      }
-      patchRemoteJob(jobId, {
-        stage: "downloading",
-        totalBytes: Number.isFinite(parsedLen) ? parsedLen : null,
-      });
-
-      const reader = res.body?.getReader();
-      const chunks: Uint8Array[] = [];
-      let loadedBytes = 0;
-      let prevBytes = 0;
-      let prevAt = Date.now();
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (!value) continue;
-          loadedBytes += value.byteLength;
-          if (loadedBytes > maxBytes) {
-            throw new Error("Remote file too large");
-          }
-          chunks.push(value);
-          const now = Date.now();
-          const deltaMs = Math.max(now - prevAt, 1);
-          const speedBps = ((loadedBytes - prevBytes) / deltaMs) * 1000;
-          prevAt = now;
-          prevBytes = loadedBytes;
-          patchRemoteJob(jobId, {
-            stage: "downloading",
-            loadedBytes,
-            speedBps,
-          });
-        }
-      } else {
-        const buf = new Uint8Array(await res.arrayBuffer());
-        loadedBytes = buf.byteLength;
-        if (loadedBytes > maxBytes) {
-          throw new Error("Remote file too large");
-        }
-        chunks.push(buf);
-        patchRemoteJob(jobId, {
-          stage: "downloading",
-          loadedBytes,
-          totalBytes: loadedBytes,
-          speedBps: 0,
-        });
-      }
-
-      const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-      await checkUploadAllowed(uid, buf.length);
       patchRemoteJob(jobId, {
         stage: "uploading",
         loadedBytes: 0,
-        totalBytes: buf.length,
+        totalBytes: null,
         speedBps: 0,
       });
-      const contentType =
-        input.contentType?.trim() ||
-        res.headers.get("content-type")?.split(";")[0]?.trim() ||
-        "application/octet-stream";
-      const filename = resolveRemoteFilename({
-        requestedName: input.filename,
+      const out = await streamRemoteFileToStorage({
+        userId: uid,
         sourceUrl,
-        contentDisposition: res.headers.get("content-disposition"),
-        contentType,
-      });
-      const key = buildObjectKey(uid, filename);
-      await putObjectBytes({
-        key,
-        body: buf,
-        contentType,
+        requestedName: input.filename,
+        requestedContentType: input.contentType,
+        maxBytes: plan.limits.maxSingleFileBytes,
+        onProgress: ({ loadedBytes, totalBytes, speedBps }) => {
+          patchRemoteJob(jobId, {
+            stage: "uploading",
+            loadedBytes,
+            totalBytes,
+            speedBps,
+          });
+        },
       });
       patchRemoteJob(jobId, {
         stage: "done",
-        loadedBytes: buf.length,
-        totalBytes: buf.length,
+        loadedBytes: out.size,
+        totalBytes: out.totalBytes ?? out.size,
         speedBps: 0,
-        key,
-        size: buf.length,
-        contentType,
-        filename,
+        key: out.key,
+        size: out.size,
+        contentType: out.contentType,
+        filename: out.filename,
       });
     } catch (e) {
       patchRemoteJob(jobId, {
