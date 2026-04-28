@@ -55,12 +55,6 @@ export default function Header() {
           {user ? (
             <>
               <Link
-                href="/account/api/docs"
-                className="rounded border border-border/70 bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-muted/40 hover:text-foreground sm:px-2.5 sm:text-[11px]"
-              >
-                Docs
-              </Link>
-              <Link
                 href="/account/profile"
                 className="rounded border border-border/70 bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-muted/40 hover:text-foreground sm:px-2.5 sm:text-[11px]"
               >

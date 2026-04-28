@@ -13,7 +13,6 @@ export type PlanLimitErrorCode =
   | "DAILY_UPLOAD_LIMIT_EXCEEDED"
   | "BANDWIDTH_LIMIT_EXCEEDED"
   | "FAIR_USE_FLAGGED"
-  | "PLAN_REMOTE_DISABLED"
   | "PLAN_FOLDER_LIMIT";
 
 export class PlanQuotaError extends Error {
@@ -29,16 +28,6 @@ export class PlanQuotaError extends Error {
 export async function getResolvedPlanForUser(userId: string) {
   const slug = await getUserPlanSlug(userId);
   return { slug, plan: resolvePlan(slug) };
-}
-
-export async function assertRemoteUploadAllowed(userId: string) {
-  const { slug, plan } = await getResolvedPlanForUser(userId);
-  if (slug !== "diamond" || !plan.limits.remoteUploadEnabled) {
-    throw new PlanQuotaError(
-      "Remote upload is only available on the Diamond plan.",
-      "PLAN_REMOTE_DISABLED",
-    );
-  }
 }
 
 export async function assertCanAcceptFileUpload(

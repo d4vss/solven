@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangleIcon,
-  BookOpenIcon,
   KeyRound,
   Loader2Icon,
   PlusIcon,
@@ -127,13 +125,6 @@ export function AccountApiKeysPanel() {
             >
               API keys
             </h2>
-            <Link
-              href="/account/api/docs"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
-            >
-              <BookOpenIcon className="size-3.5" aria-hidden />
-              Remote upload and API reference
-            </Link>
           </div>
         </div>
       </div>
