@@ -23,7 +23,6 @@ export {
   checkDownloadAllowed,
   getPlanLimits,
   assertCanCreateFolder,
-  assertRemoteUploadAllowed,
   inactiveAutoDeleteDeadline,
   nextExpiresAtAfterDownload,
   expiresAtForNewFile,
