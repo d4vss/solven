@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -7,10 +6,8 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import Logo from "@/components/brand/logo";
-import { OnboardingView } from "@/components/onboarding/onboarding-view";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Solven",
@@ -27,13 +24,6 @@ const homeActionClassName = cn(
 );
 
 export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const user = session?.user as { username?: string | null } | undefined;
-  const needsOnboarding =
-    !!user && (user.username == null || user.username === "");
-
   return (
     <>
       <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 pb-10 pt-20 md:px-8 md:pt-24">
@@ -144,11 +134,6 @@ export default async function Home() {
           </div>
         </div>
       </section>
-      {needsOnboarding ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <OnboardingView mode="dialog" />
-        </div>
-      ) : null}
     </>
   );
 }

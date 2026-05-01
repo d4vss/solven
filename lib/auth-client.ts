@@ -1,8 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import {
-  lastLoginMethodClient,
-  usernameClient,
-} from "better-auth/client/plugins";
+import { lastLoginMethodClient } from "better-auth/client/plugins";
 
 function authClientBaseURL() {
   if (typeof window !== "undefined") {
@@ -17,7 +14,7 @@ function authClientBaseURL() {
 
 const authClient = createAuthClient({
   baseURL: authClientBaseURL(),
-  plugins: [usernameClient(), lastLoginMethodClient()],
+  plugins: [lastLoginMethodClient()],
 });
 
 export function useSession() {
@@ -30,17 +27,6 @@ export function signInWithOAuth(provider: "github" | "google") {
 
 export function signOut() {
   return authClient.signOut();
-}
-
-export function isUsernameAvailable(username: string) {
-  return authClient.isUsernameAvailable({ username });
-}
-
-export function setUsername(username: string) {
-  return authClient.updateUser({
-    username,
-    displayUsername: username,
-  });
 }
 
 export function deleteAccount(options?: { callbackURL?: string }) {

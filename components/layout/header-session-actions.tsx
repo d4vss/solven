@@ -14,24 +14,18 @@ import { cn } from "@/lib/utils";
 export type SessionUser = {
   name?: string | null;
   email?: string | null;
-  username?: string | null;
-  displayUsername?: string | null;
 };
 
-function usernameLabel(user: SessionUser) {
-  const raw =
-    user.displayUsername?.trim() ||
-    user.username?.trim() ||
-    user.name?.trim() ||
-    null;
+function accountLabel(user: SessionUser) {
+  const raw = user.name?.trim() || user.email?.trim() || null;
   if (!raw) return "Account";
-  return raw.startsWith("@") ? raw : `@${raw}`;
+  return raw;
 }
 
 export function HeaderSessionActions({ user }: { user: SessionUser }) {
   const router = useRouter();
   const pathname = usePathname();
-  const label = usernameLabel(user);
+  const label = accountLabel(user);
   const [planSlug, setPlanSlug] = useState<string | null>(null);
 
   const syncPlanSlug = useCallback(async () => {
@@ -61,7 +55,7 @@ export function HeaderSessionActions({ user }: { user: SessionUser }) {
       });
     } finally {
       router.refresh();
-      if (pathname === "/onboarding" || pathname.startsWith("/account")) {
+      if (pathname.startsWith("/account")) {
         router.replace("/signin");
       }
     }

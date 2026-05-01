@@ -1,14 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import db from "@/lib/db";
-import { lastLoginMethod, username } from "better-auth/plugins";
+import { lastLoginMethod } from "better-auth/plugins";
 import { allowNewSignUps } from "@/lib/auth-config";
 
 const signUpsEnabled = allowNewSignUps();
 
 export const auth = betterAuth({
   plugins: [
-    username(),
     lastLoginMethod({
       storeInDatabase: true,
     }),

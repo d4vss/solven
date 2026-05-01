@@ -12,8 +12,6 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  username: text("username").unique(),
-  displayUsername: text("display_username"),
   lastLoginMethod: text("last_login_method"),
 });
 
