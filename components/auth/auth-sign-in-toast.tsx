@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { SOCIAL_SIGN_IN_PENDING_KEY } from "@/lib/auth-toast-storage";
+import { emitAuthChanged } from "@/lib/auth-events";
 import { useSession } from "@/lib/auth-client";
 
 /**
@@ -24,6 +25,8 @@ export function AuthSignInToast() {
     if (!session?.user) {
       return;
     }
+
+    emitAuthChanged();
 
     const email = session.user.email?.trim();
     if (email) {

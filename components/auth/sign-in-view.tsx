@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2Icon } from "lucide-react";
 import { SiGithub } from "react-icons/si";
 import { FcGoogle } from "react-icons/fc";
@@ -14,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getLastUsedLoginMethod, signInWithOAuth } from "@/lib/auth-client";
+import { getLastUsedLoginMethod, signInWithOAuth, useSession } from "@/lib/auth-client";
 import { SOCIAL_SIGN_IN_PENDING_KEY } from "@/lib/auth-toast-storage";
 
 type OAuthProvider = "github" | "google";
@@ -27,20 +28,35 @@ function lastUsedPill() {
   );
 }
 
+function safeNextPath(raw: string | null): string {
+  if (!raw?.startsWith("/") || raw.startsWith("//")) return "/account";
+  if (raw.startsWith("/signin")) return "/account";
+  return raw;
+}
+
 export function SignInView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session, isPending } = useSession();
   const [pending, setPending] = useState<OAuthProvider | null>(null);
   const [lastMethod] = useState<string | null>(() => {
     const raw = getLastUsedLoginMethod();
     return raw ? raw.trim().toLowerCase() : null;
   });
   const busy = pending !== null;
+  const callbackURL = safeNextPath(searchParams.get("next"));
+
+  useEffect(() => {
+    if (isPending || !session?.user) return;
+    router.replace(callbackURL);
+  }, [callbackURL, isPending, router, session?.user]);
 
   function start(provider: OAuthProvider) {
     setPending(provider);
     if (typeof window !== "undefined") {
       sessionStorage.setItem(SOCIAL_SIGN_IN_PENDING_KEY, provider);
     }
-    void signInWithOAuth(provider).catch(() => {
+    void signInWithOAuth(provider, { callbackURL }).catch(() => {
       setPending(null);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem(SOCIAL_SIGN_IN_PENDING_KEY);

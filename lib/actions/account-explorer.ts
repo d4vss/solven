@@ -8,6 +8,7 @@ import { getEntry, listEntries } from "@/lib/account/storage-entry-repo";
 import {
   assertCanCreateSharedLink,
   createFolder,
+  moveEntry,
   purgeExpiredFilesForUser,
   registerUploadedFile,
   removeEntryTree,
@@ -47,6 +48,11 @@ const createShareSchema = z.object({
 
 const bulkDeleteSchema = z.object({
   entryIds: z.array(z.string().min(1)).min(1).max(500),
+});
+
+const moveEntriesSchema = z.object({
+  entryIds: z.array(z.string().min(1)).min(1).max(500),
+  targetParentId: z.union([z.string().min(1), z.null()]),
 });
 
 async function sumFolderSizeBytes(
@@ -300,6 +306,38 @@ export async function deleteAccountEntryAction(entryId: string) {
     return { ok: true, data: { ok: true } } as const;
   } catch (e) {
     return { ok: false, error: (e as Error).message ?? "Delete failed." } as const;
+  }
+}
+
+export async function moveAccountEntriesAction(input: z.input<typeof moveEntriesSchema>) {
+  try {
+    const parsed = moveEntriesSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: "Invalid move payload." } satisfies ActionResult<never>;
+    }
+    const userId = await requireSessionUserId();
+    const uniqueIds = Array.from(new Set(parsed.data.entryIds));
+    let moved = 0;
+
+    for (const entryId of uniqueIds) {
+      if (entryId === parsed.data.targetParentId) continue;
+      await moveEntry({
+        userId,
+        entryId,
+        targetParentId: parsed.data.targetParentId,
+      });
+      moved += 1;
+    }
+
+    return { ok: true, data: { moved, requested: uniqueIds.length } } satisfies ActionResult<{
+      moved: number;
+      requested: number;
+    }>;
+  } catch (e) {
+    return {
+      ok: false,
+      error: (e as Error).message ?? "Could not move items.",
+    } satisfies ActionResult<never>;
   }
 }
 

@@ -19,8 +19,6 @@ export default function Header() {
   const user = session?.user;
 
   const showSessionLoading = isPending;
-  const hideAuthCluster =
-    pathname === "/signin" && !isPending && !user;
 
   useEffect(() => {
     void refetch();
@@ -63,7 +61,7 @@ export default function Header() {
             </>
           ) : null}
         </nav>
-        {hideAuthCluster ? null : showSessionLoading ? (
+        {showSessionLoading ? (
           <Button
             disabled
             variant="outline"

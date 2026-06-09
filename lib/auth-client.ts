@@ -8,12 +8,16 @@ function authClientBaseURL() {
   const fromEnv =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
     process.env.NEXT_PUBLIC_AUTH_URL?.replace(/\/$/, "") ||
+    process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ||
     "";
   return fromEnv || undefined;
 }
 
 const authClient = createAuthClient({
   baseURL: authClientBaseURL(),
+  fetchOptions: {
+    credentials: "include",
+  },
   plugins: [lastLoginMethodClient()],
 });
 
@@ -21,8 +25,14 @@ export function useSession() {
   return authClient.useSession();
 }
 
-export function signInWithOAuth(provider: "github" | "google") {
-  return authClient.signIn.social({ provider });
+export function signInWithOAuth(
+  provider: "github" | "google",
+  options?: { callbackURL?: string },
+) {
+  return authClient.signIn.social({
+    provider,
+    callbackURL: options?.callbackURL ?? "/account",
+  });
 }
 
 export function signOut() {

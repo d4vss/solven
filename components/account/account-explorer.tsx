@@ -67,6 +67,7 @@ import {
   getAccountPlanAction,
   listAccountEntriesAction,
   listAccountShareLinksAction,
+  moveAccountEntriesAction,
   registerAccountUploadAction,
   revokeAccountShareLinkAction,
 } from "@/lib/actions/account-explorer";
@@ -245,6 +246,9 @@ export function AccountExplorer({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dragIds, setDragIds] = useState<string[]>([]);
   const [dragHoverFolderId, setDragHoverFolderId] = useState<string | null>(
+    null,
+  );
+  const [dragHoverCrumbIndex, setDragHoverCrumbIndex] = useState<number | null>(
     null,
   );
   const [isFileDropActive, setIsFileDropActive] = useState(false);
@@ -571,7 +575,7 @@ export function AccountExplorer({
     });
   }
 
-  async function uploadFile(task: UploadTask) {
+  async function uploadFile(task: UploadTask, uploadParentId = parentId) {
     const { id: taskId } = task;
     if (uploadAbortByPlanRef.current || uploadAbortReasonRef.current) {
       updateUploadTask(taskId, {
@@ -631,7 +635,7 @@ export function AccountExplorer({
         key: pj.key,
         name: task.name,
         expectedSizeBytes: task.size,
-        parentId,
+        parentId: uploadParentId,
       });
       if (!rr.ok) {
         updateUploadTask(taskId, {
@@ -666,7 +670,10 @@ export function AccountExplorer({
     }
   }
 
-  async function uploadFiles(files: FileList | File[]) {
+  async function uploadFiles(
+    files: FileList | File[],
+    uploadParentId: string | null = parentId,
+  ) {
     const list = Array.from(files);
     if (list.length === 0) return;
     const blocked = list.filter((file) => isBlockedUploadFile(file.name));
@@ -721,7 +728,7 @@ export function AccountExplorer({
             const task = queuedTasks[cursor];
             cursor += 1;
             if (!task) break;
-            await uploadFile(task);
+            await uploadFile(task, uploadParentId);
           }
         }),
       );
@@ -948,6 +955,56 @@ export function AccountExplorer({
 
   function hasNativeFilesDrag(ev: DragEvent<HTMLElement>) {
     return Array.from(ev.dataTransfer.types).includes("Files");
+  }
+
+  function parseDraggedEntryIds(ev: DragEvent<HTMLElement>): string[] {
+    const raw = ev.dataTransfer.getData("application/x-solven-entry-ids");
+    const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+    return parsed.length > 0 ? parsed : dragIds;
+  }
+
+  async function moveDraggedEntries(
+    ev: DragEvent<HTMLElement>,
+    targetParentId: string | null,
+    targetFolderId?: string,
+  ) {
+    if (hasNativeFilesDrag(ev)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragHoverFolderId(null);
+    setDragHoverCrumbIndex(null);
+
+    const ids = parseDraggedEntryIds(ev);
+    if (ids.length === 0) {
+      toast.error("Could not determine dragged items.");
+      return;
+    }
+    if (targetFolderId && ids.includes(targetFolderId)) {
+      toast.error("Drop selected items into another folder.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const r = await moveAccountEntriesAction({
+        entryIds: ids,
+        targetParentId,
+      });
+      if (!r.ok) {
+        toast.error(r.error ?? "Could not move items.");
+        return;
+      }
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+      await loadEntries();
+      toast.success(
+        r.data.moved === 1
+          ? "Moved 1 item."
+          : `Moved ${r.data.moved} items.`,
+      );
+    } finally {
+      setBusy(false);
+      setDragIds([]);
+    }
   }
 
   function onExplorerDragOver(ev: DragEvent<HTMLDivElement>) {
@@ -1188,11 +1245,26 @@ export function AccountExplorer({
                       if (i === crumbs.length - 1) return;
                       crumbTo(i);
                     }}
+                    onDragOver={(ev) => {
+                      if (i === crumbs.length - 1) return;
+                      if (hasNativeFilesDrag(ev)) return;
+                      ev.preventDefault();
+                      ev.dataTransfer.dropEffect = "move";
+                      setDragHoverCrumbIndex(i);
+                    }}
+                    onDragLeave={() => {
+                      if (dragHoverCrumbIndex === i) setDragHoverCrumbIndex(null);
+                    }}
+                    onDrop={(ev) => {
+                      if (i === crumbs.length - 1) return;
+                      void moveDraggedEntries(ev, c.id);
+                    }}
                     className={cn(
                       "rounded px-1 py-0.5 font-mono text-[12px] tracking-tight",
                       i === crumbs.length - 1
                         ? "text-foreground"
                         : "text-muted-foreground hover:bg-muted/50",
+                      dragHoverCrumbIndex === i && "bg-muted/40 text-foreground",
                     )}
                     aria-current={i === crumbs.length - 1 ? "page" : undefined}
                   >
@@ -1295,36 +1367,42 @@ export function AccountExplorer({
                       onDragEnd={() => {
                         setDragIds([]);
                         setDragHoverFolderId(null);
+                        setDragHoverCrumbIndex(null);
                       }}
                       onDragOver={(ev) => {
                         if (e.kind !== "folder") return;
-                        if (hasNativeFilesDrag(ev)) return;
+                        if (hasNativeFilesDrag(ev)) {
+                          ev.preventDefault();
+                          ev.dataTransfer.dropEffect = "copy";
+                          setDragHoverFolderId(e.id);
+                          return;
+                        }
                         ev.preventDefault();
+                        ev.dataTransfer.dropEffect = "move";
                         setDragHoverFolderId(e.id);
                       }}
-                      onDragLeave={() => {
+                      onDragLeave={(ev) => {
+                        const nextTarget = ev.relatedTarget as Node | null;
+                        if (
+                          nextTarget &&
+                          ev.currentTarget.contains(nextTarget)
+                        ) {
+                          return;
+                        }
                         if (dragHoverFolderId === e.id)
                           setDragHoverFolderId(null);
                       }}
                       onDrop={(ev) => {
                         if (e.kind !== "folder") return;
-                        if (hasNativeFilesDrag(ev)) return;
-                        ev.preventDefault();
-                        const raw = ev.dataTransfer.getData(
-                          "application/x-solven-entry-ids",
-                        );
-                        const parsed = raw ? (JSON.parse(raw) as string[]) : [];
-                        const ids = parsed.length > 0 ? parsed : dragIds;
-                        if (ids.length === 0) {
-                          toast.error("Could not determine dragged items.");
+                        if (hasNativeFilesDrag(ev)) {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          setDragHoverFolderId(null);
+                          if (busy) return;
+                          void uploadFiles(ev.dataTransfer.files, e.id);
                           return;
                         }
-                        if (ids.includes(e.id)) {
-                          toast.error(
-                            "Drop selected items into another folder.",
-                          );
-                          return;
-                        }
+                        void moveDraggedEntries(ev, e.id, e.id);
                       }}
                       className={cn(
                         "border-border/80 hover:bg-muted/20",
