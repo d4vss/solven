@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2Icon } from "lucide-react";
@@ -37,10 +37,12 @@ function safeNextPath(raw: string | null): string {
 export function SignInView() {
   const searchParams = useSearchParams();
   const [pending, setPending] = useState<OAuthProvider | null>(null);
-  const [lastMethod] = useState<string | null>(() => {
+  const [lastMethod, setLastMethod] = useState<string | null>(null);
+
+  useEffect(() => {
     const raw = getLastUsedLoginMethod();
-    return raw ? raw.trim().toLowerCase() : null;
-  });
+    setLastMethod(raw ? raw.trim().toLowerCase() : null);
+  }, []);
   const busy = pending !== null;
   const callbackURL = safeNextPath(searchParams.get("next"));
 

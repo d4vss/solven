@@ -21,6 +21,26 @@ export function allowNewSignUps(): boolean {
 }
 
 /** Host patterns Better Auth accepts when deriving baseURL per request. */
+export function resolveAuthBaseURL():
+  | string
+  | { allowedHosts: string[]; protocol: "auto" } {
+  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const authUrl = process.env.BETTER_AUTH_URL?.trim();
+
+  // A localhost BETTER_AUTH_URL in production breaks cookie signing and
+  // get-session behind HTTPS reverse proxies — the header uses that API.
+  if (process.env.NODE_ENV === "production") {
+    if (publicUrl && !publicUrl.includes("localhost")) {
+      return publicUrl;
+    }
+    return { allowedHosts: authAllowedHosts(), protocol: "auto" };
+  }
+
+  if (authUrl) return authUrl;
+  if (publicUrl) return publicUrl;
+  return "http://localhost:3000";
+}
+
 export function authAllowedHosts(): string[] {
   const hosts = new Set<string>(["localhost:3000", "localhost:*", "127.0.0.1:3000"]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { LogInIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,8 +10,12 @@ import { useSession } from "@/lib/auth-client";
 import Logo from "../brand/logo";
 
 export default function Header() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch } = useSession();
   const user = session?.user;
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
 
   return (
     <header className="relative h-0 shrink-0">
