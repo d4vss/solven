@@ -1,34 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
 import { LogInIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeaderSessionActions } from "@/components/layout/header-session-actions";
-import { onAuthChanged } from "@/lib/auth-events";
 import { useSession } from "@/lib/auth-client";
 import Logo from "../brand/logo";
 
 export default function Header() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { data: session, isPending, refetch } = useSession();
+  const { data: session, isPending } = useSession();
   const user = session?.user;
-
-  const showSessionLoading = isPending;
-
-  useEffect(() => {
-    void refetch();
-  }, [pathname, refetch]);
-
-  useEffect(() => {
-    return onAuthChanged(() => {
-      void refetch();
-    });
-  }, [refetch]);
 
   return (
     <header className="relative h-0 shrink-0">
@@ -51,17 +33,15 @@ export default function Header() {
             Plans
           </Link>
           {user ? (
-            <>
-              <Link
-                href="/account/profile"
-                className="rounded border border-border/70 bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-muted/40 hover:text-foreground sm:px-2.5 sm:text-[11px]"
-              >
-                Profile
-              </Link>
-            </>
+            <Link
+              href="/account/profile"
+              className="rounded border border-border/70 bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground transition hover:bg-muted/40 hover:text-foreground sm:px-2.5 sm:text-[11px]"
+            >
+              Profile
+            </Link>
           ) : null}
         </nav>
-        {showSessionLoading ? (
+        {isPending ? (
           <Button
             disabled
             variant="outline"
@@ -72,13 +52,13 @@ export default function Header() {
           </Button>
         ) : !user ? (
           <Button
-            type="button"
+            asChild
             variant="outline"
-            className="size-9 shrink-0 cursor-pointer rounded-lg p-0"
-            aria-label="Sign in"
-            onClick={() => router.push("/sign-in")}
+            className="size-9 shrink-0 rounded-lg p-0"
           >
-            <LogInIcon className="size-3.5" aria-hidden />
+            <Link href="/sign-in" aria-label="Sign in">
+              <LogInIcon className="size-3.5" aria-hidden />
+            </Link>
           </Button>
         ) : (
           <HeaderSessionActions user={user} />

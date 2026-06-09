@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2Icon } from "lucide-react";
@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getLastUsedLoginMethod, signInWithOAuth, useSession } from "@/lib/auth-client";
+import { getLastUsedLoginMethod, signInWithOAuth } from "@/lib/auth-client";
 import { SOCIAL_SIGN_IN_PENDING_KEY } from "@/lib/auth-toast-storage";
 
 type OAuthProvider = "github" | "google";
@@ -36,7 +36,6 @@ function safeNextPath(raw: string | null): string {
 
 export function SignInView() {
   const searchParams = useSearchParams();
-  const { data: session, isPending } = useSession();
   const [pending, setPending] = useState<OAuthProvider | null>(null);
   const [lastMethod] = useState<string | null>(() => {
     const raw = getLastUsedLoginMethod();
@@ -45,21 +44,12 @@ export function SignInView() {
   const busy = pending !== null;
   const callbackURL = safeNextPath(searchParams.get("next"));
 
-  useEffect(() => {
-    if (isPending || !session?.user) return;
-    window.location.assign(callbackURL);
-  }, [callbackURL, isPending, session?.user]);
-
   function start(provider: OAuthProvider) {
     setPending(provider);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(SOCIAL_SIGN_IN_PENDING_KEY, provider);
-    }
+    sessionStorage.setItem(SOCIAL_SIGN_IN_PENDING_KEY, provider);
     void signInWithOAuth(provider, { callbackURL }).catch(() => {
       setPending(null);
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(SOCIAL_SIGN_IN_PENDING_KEY);
-      }
+      sessionStorage.removeItem(SOCIAL_SIGN_IN_PENDING_KEY);
     });
   }
 

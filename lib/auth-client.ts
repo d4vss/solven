@@ -1,20 +1,11 @@
 import { createAuthClient } from "better-auth/react";
 import { lastLoginMethodClient } from "better-auth/client/plugins";
 
-function authClientBaseURL() {
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  const fromEnv =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_AUTH_URL?.replace(/\/$/, "") ||
-    process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ||
-    "";
-  return fromEnv || undefined;
-}
-
 const authClient = createAuthClient({
-  baseURL: authClientBaseURL(),
+  baseURL:
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_APP_URL,
   fetchOptions: {
     credentials: "include",
   },
@@ -35,22 +26,8 @@ export function signInWithOAuth(
   });
 }
 
-function clearClientSession() {
-  const sessionAtom = authClient.$store.atoms.session;
-  const current = sessionAtom.get();
-  sessionAtom.set({
-    ...current,
-    data: null,
-    error: null,
-    isPending: false,
-    isRefetching: false,
-  });
-}
-
-export async function signOut() {
-  const result = await authClient.signOut();
-  clearClientSession();
-  return result;
+export function signOut() {
+  return authClient.signOut();
 }
 
 export function deleteAccount(options?: { callbackURL?: string }) {
@@ -68,9 +45,7 @@ export function getLastUsedLoginMethod(): string | null {
   return method == null || method === "" ? null : method;
 }
 
-export function isLastUsedLoginMethod(
-  method: string,
-): boolean {
+export function isLastUsedLoginMethod(method: string): boolean {
   return (
     authClient as unknown as {
       isLastUsedLoginMethod?: (m: string) => boolean;

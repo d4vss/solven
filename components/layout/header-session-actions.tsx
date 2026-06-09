@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { LogOutIcon, UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -22,8 +21,6 @@ function accountLabel(user: SessionUser) {
 }
 
 export function HeaderSessionActions({ user }: { user: SessionUser }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const label = accountLabel(user);
   const [planSlug, setPlanSlug] = useState<string | null>(null);
 
@@ -46,19 +43,9 @@ export function HeaderSessionActions({ user }: { user: SessionUser }) {
   }, [syncPlanSlug]);
 
   async function doSignOut() {
-    try {
-      await signOut();
-      toast.success("Signed out", {
-        description: "You can sign in again anytime.",
-      });
-    } finally {
-      if (pathname.startsWith("/account")) {
-        // Full navigation avoids RSC router conflicts after auth state changes.
-        window.location.assign("/sign-in");
-        return;
-      }
-      router.refresh();
-    }
+    await signOut();
+    toast.success("Signed out");
+    window.location.href = "/";
   }
 
   return (
