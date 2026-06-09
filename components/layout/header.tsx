@@ -76,7 +76,7 @@ export default function Header() {
             variant="outline"
             className="size-9 shrink-0 cursor-pointer rounded-lg p-0"
             aria-label="Sign in"
-            onClick={() => router.push("/signin")}
+            onClick={() => router.push("/sign-in")}
           >
             <LogInIcon className="size-3.5" aria-hidden />
           </Button>

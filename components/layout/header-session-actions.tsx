@@ -52,10 +52,12 @@ export function HeaderSessionActions({ user }: { user: SessionUser }) {
         description: "You can sign in again anytime.",
       });
     } finally {
-      router.refresh();
       if (pathname.startsWith("/account")) {
-        router.replace("/signin");
+        // Full navigation avoids RSC router conflicts after auth state changes.
+        window.location.assign("/sign-in");
+        return;
       }
+      router.refresh();
     }
   }
 

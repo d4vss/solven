@@ -49,7 +49,7 @@ export function AccountSettings({
   async function onConfirmDelete() {
     setDeleting(true);
     try {
-      const res = (await deleteAccount({ callbackURL: "/signin" })) as {
+      const res = (await deleteAccount({ callbackURL: "/sign-in" })) as {
         error?: { message?: string } | null;
       };
       if (res.error) {
@@ -59,7 +59,7 @@ export function AccountSettings({
         return;
       }
       toast.success("Account deleted");
-      window.location.href = "/signin";
+      window.location.href = "/sign-in";
     } catch {
       toast.error("Could not delete account.");
     } finally {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2Icon } from "lucide-react";
 import { SiGithub } from "react-icons/si";
 import { FcGoogle } from "react-icons/fc";
@@ -30,12 +30,11 @@ function lastUsedPill() {
 
 function safeNextPath(raw: string | null): string {
   if (!raw?.startsWith("/") || raw.startsWith("//")) return "/account";
-  if (raw.startsWith("/signin")) return "/account";
+  if (raw.startsWith("/sign-in") || raw.startsWith("/signin")) return "/account";
   return raw;
 }
 
 export function SignInView() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending } = useSession();
   const [pending, setPending] = useState<OAuthProvider | null>(null);
@@ -48,8 +47,8 @@ export function SignInView() {
 
   useEffect(() => {
     if (isPending || !session?.user) return;
-    router.replace(callbackURL);
-  }, [callbackURL, isPending, router, session?.user]);
+    window.location.assign(callbackURL);
+  }, [callbackURL, isPending, session?.user]);
 
   function start(provider: OAuthProvider) {
     setPending(provider);

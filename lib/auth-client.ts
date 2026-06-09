@@ -55,7 +55,7 @@ export async function signOut() {
 
 export function deleteAccount(options?: { callbackURL?: string }) {
   return authClient.deleteUser({
-    callbackURL: options?.callbackURL ?? "/signin",
+    callbackURL: options?.callbackURL ?? "/sign-in",
   });
 }
 

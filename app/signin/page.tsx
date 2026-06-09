@@ -1,21 +1,11 @@
-import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { SignInView } from "@/components/auth/sign-in-view";
-import { auth } from "@/lib/auth";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  description: "Sign in to Solven with GitHub or Google.",
-};
-
-export default async function SignInPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (session?.user) {
-    redirect("/account");
-  }
-
-  return <SignInView />;
+export default async function LegacySignInRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  const url = next ? `/sign-in?next=${encodeURIComponent(next)}` : "/sign-in";
+  redirect(url);
 }
