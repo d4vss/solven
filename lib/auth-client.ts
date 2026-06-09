@@ -35,8 +35,22 @@ export function signInWithOAuth(
   });
 }
 
-export function signOut() {
-  return authClient.signOut();
+function clearClientSession() {
+  const sessionAtom = authClient.$store.atoms.session;
+  const current = sessionAtom.get();
+  sessionAtom.set({
+    ...current,
+    data: null,
+    error: null,
+    isPending: false,
+    isRefetching: false,
+  });
+}
+
+export async function signOut() {
+  const result = await authClient.signOut();
+  clearClientSession();
+  return result;
 }
 
 export function deleteAccount(options?: { callbackURL?: string }) {
