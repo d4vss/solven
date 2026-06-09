@@ -45,6 +45,7 @@ export function HeaderSessionActions({ user }: { user: SessionUser }) {
   async function doSignOut() {
     await signOut();
     toast.success("Signed out");
+    window.location.href = "/";
   }
 
   return (
